@@ -28,6 +28,7 @@
 #include "renderpass.hpp"
 #include "format.hpp"
 #include "logger.hpp"
+#include "blacklist.hpp"
 
 #include "effect.hpp"
 #include "effect_fxaa.hpp"
@@ -855,8 +856,9 @@ extern "C"
     VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkBasalt_GetInstanceProcAddr(VkInstance instance, const char* pName);
 
 #define GETPROCADDR(func)                                                                                                                            \
+    if (!is_blacklisted() || (f == "vkCreateInstance" || f == "vkDestroyInstance" || f == "vkCreateDevice" || f == "vkDestroyDevice")) {             \
     if (!std::strcmp(pName, "vk" #func))                                                                                                             \
-        return (PFN_vkVoidFunction) &vkBasalt::vkBasalt_##func;
+        return (PFN_vkVoidFunction) &vkBasalt::vkBasalt_##func; }
     /*
     Return our funktions for the funktions we want to intercept
     the macro takes the name and returns our vkBasalt_##func, if the name is equal
@@ -864,6 +866,7 @@ extern "C"
 
     // vkGetDeviceProcAddr needs to behave like vkGetInstanceProcAddr thanks to some games
 #define INTERCEPT_CALLS                                                                                                                              \
+    std::string f(pName);                                                                                                                            \
     /* instance chain functions we intercept */                                                                                                      \
     if (!std::strcmp(pName, "vkGetInstanceProcAddr"))                                                                                                \
         return (PFN_vkVoidFunction) &vkBasalt_GetInstanceProcAddr;                                                                                   \
@@ -886,7 +889,7 @@ extern "C"
     GETPROCADDR(QueuePresentKHR);                                                                                                                    \
     GETPROCADDR(DestroySwapchainKHR);                                                                                                                \
                                                                                                                                                      \
-    if (vkBasalt::pConfig->getOption<std::string>("depthCapture", "off") == "on")                                                                    \
+    if (!is_blacklisted() && vkBasalt::pConfig->getOption<std::string>("depthCapture", "off") == "on")                                               \
     {                                                                                                                                                \
         GETPROCADDR(CreateImage);                                                                                                                    \
         GETPROCADDR(DestroyImage);                                                                                                                   \
@@ -895,7 +898,7 @@ extern "C"
 
     VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkBasalt_GetDeviceProcAddr(VkDevice device, const char* pName)
     {
-        if (vkBasalt::pConfig == nullptr)
+        if (!is_blacklisted() && vkBasalt::pConfig == nullptr)
         {
             vkBasalt::pConfig = std::shared_ptr<vkBasalt::Config>(new vkBasalt::Config());
         }
@@ -910,7 +913,7 @@ extern "C"
 
     VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkBasalt_GetInstanceProcAddr(VkInstance instance, const char* pName)
     {
-        if (vkBasalt::pConfig == nullptr)
+        if (!is_blacklisted() && vkBasalt::pConfig == nullptr)
         {
             vkBasalt::pConfig = std::shared_ptr<vkBasalt::Config>(new vkBasalt::Config());
         }
